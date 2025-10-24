@@ -1,0 +1,161 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  username     String   @unique
+  displayName  String
+  bio          String?
+  avatarUrl    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  blogs         Blog[]
+  playlists     Playlist[]
+  savedBlogs    SavedBlog[]
+  followers     Follow[]          @relation("UserFollowers")
+  following     Follow[]          @relation("UserFollowing")
+  interactions  UserInteraction[]
+
+  @@map("users")
+}
+
+model Blog {
+  id            String    @id @default(uuid())
+  title         String
+  content       String    @db.Text
+  excerpt       String
+  coverImageUrl String?
+  status        BlogStatus @default(draft)
+  viewCount     Int       @default(0)
+  publishedAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  authorId      String
+
+  // Relations
+  author     User        @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  savedBy    SavedBlog[]
+
+  @@index([authorId])
+  @@index([status])
+  @@index([publishedAt])
+  @@map("blogs")
+}
+
+enum BlogStatus {
+  draft
+  published
+}
+
+model Playlist {
+  id             String   @id @default(uuid())
+  name           String
+  description    String?
+  coverImageUrl  String?
+  isPublic       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  userId         String
+
+  // Relations
+  user   User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  movies PlaylistMovie[]
+
+  @@index([userId])
+  @@map("playlists")
+}
+
+model PlaylistMovie {
+  id              String   @id @default(uuid())
+  playlistId      String
+  movieId         String
+  movieTitle      String
+  moviePosterUrl  String?
+  movieYear       Int?
+  position        Int
+  addedAt         DateTime @default(now())
+
+  // Relations
+  playlist Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+
+  @@unique([playlistId, movieId])
+  @@index([playlistId])
+  @@map("playlist_movies")
+}
+
+model Follow {
+  id         String   @id @default(uuid())
+  followerId String
+  followeeId String
+  createdAt  DateTime @default(now())
+
+  // Relations
+  follower User @relation("UserFollowing", fields: [followerId], references: [id], onDelete: Cascade)
+  followee User @relation("UserFollowers", fields: [followeeId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followeeId])
+  @@index([followerId])
+  @@index([followeeId])
+  @@map("follows")
+}
+
+model SavedBlog {
+  id      String   @id @default(uuid())
+  userId  String
+  blogId  String
+  savedAt DateTime @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  blog Blog @relation(fields: [blogId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, blogId])
+  @@index([userId])
+  @@index([blogId])
+  @@map("saved_blogs")
+}
+
+model UserInteraction {
+  id              String          @id @default(uuid())
+  userId          String
+  interactionType InteractionType
+  targetId        String
+  targetType      TargetType
+  createdAt       DateTime        @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([targetId])
+  @@index([createdAt])
+  @@map("user_interactions")
+}
+
+enum InteractionType {
+  blog_view
+  blog_save
+  playlist_view
+  movie_add
+  follow
+}
+
+enum TargetType {
+  blog
+  playlist
+  user
+  movie
+}
